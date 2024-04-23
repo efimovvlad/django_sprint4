@@ -121,9 +121,11 @@ LANGUAGE_CODE = 'ru-RU'
 
 TIME_ZONE = 'UTC'
 
+DATE_INPUT_FORMATS = ('%d-%m-%YT%H:%M', '%Y-%m-%dT%H:%M')
+
 USE_I18N = True
 
-USE_L10N = False
+USE_L10N = True
 
 USE_TZ = True
 
@@ -131,11 +133,11 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
 
-STATIC_URL = '/static/'
-
 STATICFILES_DIRS = [
     BASE_DIR / 'static_dev',
 ]
+
+STATIC_URL = '/static/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
@@ -146,8 +148,12 @@ EMAIL_BACKEND = 'django.core.mail.backends.filebased.EmailBackend'
 
 EMAIL_FILE_PATH = BASE_DIR / 'sent_emails'
 
-LOGIN_REDIRECT_URL = 'pages:homepage'
+LOGIN_REDIRECT_URL = 'blog:index'
 
 LOGIN_URL = 'login'
 
-CSRF_FAILURE_VIEW = 'core.views.csrf_failure'
+CSRF_FAILURE_VIEW = 'pages.views.csrf_failure'
+
+MEDIA_URL = 'media/'
+
+MEDIA_ROOT = BASE_DIR / 'media'

@@ -4,7 +4,7 @@ from django.core.paginator import Paginator
 from django.utils import timezone
 from django.urls import reverse_lazy
 from django.views.generic import (
-    CreateView, DeleteView, DetailView, ListView, UpdateView
+    CreateView, DeleteView, ListView
 )
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from .forms import PostForm, CommentForm, UserForm
@@ -20,7 +20,7 @@ def search_params(posts):
     ).filter(
         is_published=True,
         category__is_published=True,
-        pub_date__lte=timezone.now()  # datetime.datetime.now()
+        pub_date__lte=timezone.now()
     )
 
 

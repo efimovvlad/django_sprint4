@@ -132,10 +132,9 @@ def add_comment(request, post_id):
 
 def update_comment(request, post_id, comment_id):
     template = 'blog/comment.html'
-    instance = get_object_or_404(Comment, pk=comment_id)
-    if instance.author != request.user:
-        return redirect('blog:post_detail', pk=post_id)
     comment = get_object_or_404(Comment, pk=comment_id)
+    if comment.author != request.user:
+        return redirect('blog:post_detail', pk=post_id)
     form = CommentForm(request.POST or None, instance=comment)
     if '/edit_comment/' in request.path:
         context = {

@@ -1,43 +1,21 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from blog.models import Post, Category, User, Comment
 from django.core.paginator import Paginator
 from django.utils import timezone
 from django.urls import reverse_lazy
-from django.views.generic import (
-    CreateView, DeleteView, ListView
-)
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from .forms import PostForm, CommentForm, UserForm
+from django.views.generic import CreateView, DeleteView, ListView
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count
-
-
-def search_params(posts):
-    return posts.select_related(
-        'category',
-        'location',
-        'author'
-    ).filter(
-        is_published=True,
-        category__is_published=True,
-        pub_date__lte=timezone.now()
-    )
-
-
-class OnlyAuthorMixin(UserPassesTestMixin):
-
-    def test_func(self):
-        object = self.get_object()
-        return object.author == self.request.user
+from blog.models import Post, Category, User, Comment
+from .forms import PostForm, UserForm, CommentForm
+from .utils import OnlyAuthorMixin, search_params
+from .constants import NUMBER_OF_POSTS
 
 
 class PostListView(ListView):
     model = Post
     template_name = 'blog/index.html'
-    queryset = search_params(Post.objects).annotate(
-        comment_count=Count('comments'))
-    ordering = ('-pub_date', 'title')
-    paginate_by = 10
+    queryset = search_params(Post.objects)
+    paginate_by = NUMBER_OF_POSTS
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):
@@ -104,10 +82,8 @@ def category_posts(request, category_slug):
     )
     post_list = search_params(Post.objects).filter(
         category=category
-    ).annotate(
-        comment_count=Count('comments')
-    ).order_by('-pub_date', 'title')
-    paginator = Paginator(post_list, 10)
+    )
+    paginator = Paginator(post_list, NUMBER_OF_POSTS)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     context = {'page_obj': page_obj, 'category': category}
@@ -117,23 +93,11 @@ def category_posts(request, category_slug):
 def profile(request, username):
     template = 'blog/profile.html'
     profile = get_object_or_404(User, username=username)
-    filters = {}
+    guest = False
     if request.user.id != profile.id:
-        filters = {
-            'is_published': True,
-            'category__is_published': True,
-            'pub_date__lte': timezone.now()
-        }
-    posts = Post.objects.select_related(
-        'category',
-        'location',
-        'author'
-    ).filter(
-        author_id=profile.id, **filters,
-    ).annotate(
-        comment_count=Count('comments')
-    ).order_by('-pub_date', 'title')
-    paginator = Paginator(posts, 10)
+        guest = True
+    posts = search_params(Post.objects, profile.id, guest)
+    paginator = Paginator(posts, NUMBER_OF_POSTS)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     context = {
@@ -166,31 +130,25 @@ def add_comment(request, post_id):
     return redirect('blog:post_detail', pk=post_id)
 
 
-def edit_comment(request, post_id, comment_id):
+def update_comment(request, post_id, comment_id):
     template = 'blog/comment.html'
     instance = get_object_or_404(Comment, pk=comment_id)
     if instance.author != request.user:
         return redirect('blog:post_detail', pk=post_id)
     comment = get_object_or_404(Comment, pk=comment_id)
     form = CommentForm(request.POST or None, instance=comment)
-    context = {
-        'form': form,
-        'comment': comment
-    }
-    if form.is_valid():
-        form.save()
-        return redirect('blog:post_detail', post_id)
-    return render(request, template, context)
-
-
-def delete_comment(request, post_id, comment_id):
-    template = 'blog/comment.html'
-    instance = get_object_or_404(Comment, pk=comment_id)
-    if instance.author != request.user:
-        return redirect('blog:post_detail', pk=post_id)
-    comment = get_object_or_404(Comment, pk=comment_id)
-    context = {'comment': comment}
-    if request.method == 'POST':
-        comment.delete()
-        return redirect('blog:post_detail', post_id)
-    return render(request, template, context)
+    if '/edit_comment/' in request.path:
+        context = {
+            'form': form,
+            'comment': comment
+        }
+        if form.is_valid():
+            form.save()
+            return redirect('blog:post_detail', post_id)
+        return render(request, template, context)
+    else:
+        context = {'comment': comment}
+        if request.method == 'POST':
+            comment.delete()
+            return redirect('blog:post_detail', post_id)
+        return render(request, template, context)

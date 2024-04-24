@@ -144,10 +144,9 @@ def update_comment(request, post_id, comment_id):
         if form.is_valid():
             form.save()
             return redirect('blog:post_detail', post_id)
-        return render(request, template, context)
     else:
         context = {'comment': comment}
         if request.method == 'POST':
             comment.delete()
             return redirect('blog:post_detail', post_id)
-        return render(request, template, context)
+    return render(request, template, context)

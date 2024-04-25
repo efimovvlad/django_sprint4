@@ -10,24 +10,18 @@ class OnlyAuthorMixin(UserPassesTestMixin):
         return object.author == self.request.user
 
 
-def search_params(posts, profile=None, guest=None):
+def search_params(posts, profile=None, filters=None):
     stage_1 = posts.select_related(
         'category',
         'location',
         'author'
     )
     if profile:
-        if guest is True:
-            filters = FILTERS_FOR_PUBLIC
-        else:
-            filters = {}
-        stage_2 = stage_1.filter(
-            author_id=profile, **filters,
-        )
+        stage_2 = stage_1.filter(author_id=profile, **filters)
     else:
-        stage_2 = stage_1.filter(
-            **FILTERS_FOR_PUBLIC
-        )
+        stage_2 = stage_1.filter(**FILTERS_FOR_PUBLIC)
     return stage_2.annotate(
         comment_count=Count('comments')
     ).order_by('-pub_date', 'title')
+    # После использования annotate, сортировка из Meta не работает.
+    # Пока не разобрался как решить, поэтому оставил сортировку здесь.

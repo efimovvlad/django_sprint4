@@ -5,10 +5,10 @@ from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView, ListView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
-from blog.models import Post, Category, User, Comment
+from .models import Post, Category, User, Comment
 from .forms import PostForm, UserForm, CommentForm
 from .utils import OnlyAuthorMixin, search_params
-from .constants import NUMBER_OF_POSTS
+from .constants import NUMBER_OF_POSTS, FILTERS_FOR_PUBLIC
 
 
 class PostListView(ListView):
@@ -93,10 +93,10 @@ def category_posts(request, category_slug):
 def profile(request, username):
     template = 'blog/profile.html'
     profile = get_object_or_404(User, username=username)
-    guest = False
+    filters = {}
     if request.user.id != profile.id:
-        guest = True
-    posts = search_params(Post.objects, profile.id, guest)
+        filters = FILTERS_FOR_PUBLIC
+    posts = search_params(Post.objects, profile.id, filters)
     paginator = Paginator(posts, NUMBER_OF_POSTS)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -130,23 +130,87 @@ def add_comment(request, post_id):
     return redirect('blog:post_detail', pk=post_id)
 
 
+def edit_comment(request, post_id, comment, context):
+    form = CommentForm(request.POST or None, instance=comment)
+    context['form'] = form
+    if form.is_valid():
+        form.save()
+        return redirect('blog:post_detail', post_id)
+    return render(request, 'blog/comment.html', context)
+
+
+def delete_comment(request, post_id, comment, context):
+    if request.method == 'POST':
+        comment.delete()
+        return redirect('blog:post_detail', post_id)
+    return render(request, 'blog/comment.html', context)
+
+
 def update_comment(request, post_id, comment_id):
-    template = 'blog/comment.html'
     comment = get_object_or_404(Comment, pk=comment_id)
+    context = {'comment': comment}
     if comment.author != request.user:
         return redirect('blog:post_detail', pk=post_id)
-    form = CommentForm(request.POST or None, instance=comment)
     if '/edit_comment/' in request.path:
-        context = {
-            'form': form,
-            'comment': comment
-        }
-        if form.is_valid():
-            form.save()
-            return redirect('blog:post_detail', post_id)
+        return edit_comment(request, post_id, comment, context)
     else:
-        context = {'comment': comment}
-        if request.method == 'POST':
-            comment.delete()
-            return redirect('blog:post_detail', post_id)
-    return render(request, template, context)
+        return delete_comment(request, post_id, comment, context)
+
+
+# Ниже написал ещё другой вариант, но мне показался он хуже.
+# Также ещё написал через CBV, самый короткий вариант по коду
+# но тоже есть дублирование, пока не разобрался как его убрать
+# если использовать классы, поэтому выше оставил что было запрошено.
+
+
+# def comment_mixin(comment_id):
+#     comment = get_object_or_404(Comment, pk=comment_id)
+#     context = {'comment': comment}
+#     return comment, context
+
+
+# def edit_comment(request, post_id, comment_id):
+#     comment, context = comment_mixin(request, post_id, comment_id)
+#     if comment.author != request.user:
+#         # Пытался вынести эту проверку отдельно,
+#         # но не получилось. Если оставлю её в миксине то редирект вернется
+#         # в распаковку и получится ерунда.
+#         return redirect('blog:post_detail', pk=post_id)
+#     form = CommentForm(request.POST or None, instance=comment)
+#     context['form'] = form
+#     if form.is_valid():
+#         form.save()
+#         return redirect('blog:post_detail', post_id)
+#     return render(request, 'blog/comment.html', context)
+
+
+# def delete_comment(request, post_id, comment_id):
+#     comment, context = comment_mixin(request, post_id, comment_id)
+#     if comment.author != request.user:
+#         return redirect('blog:post_detail', pk=post_id)
+#     if request.method == 'POST':
+#         comment.delete()
+#         return redirect('blog:post_detail', post_id)
+#     return render(request, 'blog/comment.html', context)
+
+
+# class CommentUpdateView(OnlyAuthorMixin, UpdateView):
+#     model = Comment
+#     form_class = CommentForm
+#     template_name = 'blog/comment.html'
+#     pk_url_kwarg = 'comment_id'
+
+#     def get_success_url(self):
+#         return reverse('blog:post_detail',
+#                        kwargs={'pk': self.kwargs['post_id']})
+
+
+# class CommentDeleteView(OnlyAuthorMixin, DeleteView):
+#     model = Comment
+#     form_class = CommentForm
+#     template_name = 'blog/comment.html'
+#     pk_url_kwarg = 'comment_id'
+
+#     def get_success_url(self):
+#         return reverse('blog:post_detail',
+#                        kwargs={'pk': self.kwargs['post_id']})
